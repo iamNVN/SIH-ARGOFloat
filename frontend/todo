@@ -1,0 +1,4 @@
+remove top sensors in analytics page and add all sensors and their uptime, location and details
+make sure all buttons in data export have same height. show toast notification and download dummy files
+change button styling
+change live data summary in map view page as map is moved
