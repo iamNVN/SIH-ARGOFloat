@@ -447,7 +447,7 @@ class ArgoApp:
 
     def render_analytics_page(self):
         """Render enhanced analytics dashboard"""
-        st.title("📊 ARGO Analytics Dashboard")
+        st.title("📊  Analytics ")
         
         # Generate enhanced sensor data
         all_sensors = pd.DataFrame({
@@ -493,6 +493,21 @@ class ArgoApp:
         with col4:
             avg_uptime = all_sensors['uptime'].mean()
             st.metric("⚡ Avg Uptime", f"{avg_uptime:.1f}%", delta="+0.3%")
+            
+        st.markdown("### 📤 Export Options")
+        col2, col3 = st.columns(2)
+        
+        with col2:
+            if st.button("🗺️ Export Sensor Locations", use_container_width=True):
+                content = self.create_dummy_file("sensor_locations.json", "json")
+                st.markdown(self.download_file("sensor_locations.json", content, "application/json"), unsafe_allow_html=True)
+                self.show_toast("🗺️ Location data export ready!")
+        
+        with col3:
+            if st.button("📈 Export Report", use_container_width=True):
+                content = self.create_dummy_file("monthly_report.pdf", "text")
+                st.markdown(self.download_file("monthly_report.pdf", content, "application/pdf"), unsafe_allow_html=True)
+                self.show_toast("📈 Monthly report generated!")
         
         st.markdown("---")
         
@@ -554,34 +569,7 @@ class ArgoApp:
                     self.show_modal(f"{sensor['sensor_id']} Details", modal_content)
         
         # Export options
-        st.markdown("---")
-        st.markdown("### 📤 Export Options")
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            if st.button("📊 Export Temperature Data", use_container_width=True):
-                content = self.create_dummy_file("temperature_data.csv", "csv")
-                st.markdown(self.download_file("temperature_data.csv", content, "text/csv"), unsafe_allow_html=True)
-                self.show_toast("📊 Temperature data export ready!")
-        
-        with col2:
-            if st.button("🗺️ Export Sensor Locations", use_container_width=True):
-                content = self.create_dummy_file("sensor_locations.json", "json")
-                st.markdown(self.download_file("sensor_locations.json", content, "application/json"), unsafe_allow_html=True)
-                self.show_toast("🗺️ Location data export ready!")
-        
-        with col3:
-            if st.button("📈 Generate Report", use_container_width=True):
-                content = self.create_dummy_file("monthly_report.pdf", "text")
-                st.markdown(self.download_file("monthly_report.pdf", content, "application/pdf"), unsafe_allow_html=True)
-                self.show_toast("📈 Monthly report generated!")
-        
-        with col4:
-            if st.button("⚙️ System Diagnostics", use_container_width=True):
-                content = self.create_dummy_file("diagnostics.txt", "text")
-                st.markdown(self.download_file("diagnostics.txt", content, "text/plain"), unsafe_allow_html=True)
-                self.show_toast("⚙️ Diagnostic report ready!")
-
+       
     def render_chat_page(self):
         """Render the chat interface"""
         st.title("💬 ARGO Assistant")
@@ -615,104 +603,256 @@ class ArgoApp:
                         self.display_message(message)
 
     def render_map_page(self):
-        """Render enhanced map view with live data updates"""
+        """Render the enhanced map view page"""
         st.title("🗺️ ARGO Ocean Data Visualization")
+        st.markdown("Real-time oceanographic measurements from ARGO float sensors across Indian and Pacific Oceans")
+        st.markdown("")
+        # Initialize session state for map
+        if "map_centered" not in st.session_state:
+            st.session_state.map_centered = False
         
-        # Real-time location tracking
-        col1, col2, col3 = st.columns([2, 1, 1])
-        with col1:
-            st.markdown("**Live Data Updates:** Real-time oceanographic measurements")
-        with col2:
-            if st.button("🎯 My Location", key="my_location"):
-                st.session_state["map_center"] = {"lat": 11.0168, "lon": 76.9558}
-                st.rerun()
-        with col3:
-            auto_update = st.checkbox("🔄 Auto Update", value=False)  # Changed default to False
+        # Get user's current location (Coimbatore, Tamil Nadu)
+        current_lat, current_lon = 11.0168, 76.9558
         
-        # Generate dynamic sensor data based on current map view
-        center_lat = st.session_state["map_center"]["lat"]
-        center_lon = st.session_state["map_center"]["lon"]
-        
-        # Create sensors around current map center
-        n_sensors = 20
-        lat_range = np.random.normal(center_lat, 3, n_sensors)
-        lon_range = np.random.normal(center_lon, 4, n_sensors)
-        
-        dynamic_sensors = pd.DataFrame({
-            'lat': lat_range,
-            'lon': lon_range,
-            'temperature': np.random.uniform(20.0, 35.0, n_sensors),
-            'salinity': np.random.uniform(33.0, 36.0, n_sensors),
-            'depth': np.random.randint(1500, 5000, n_sensors),
-            'sensor_id': [f'ARGO-{i:03d}' for i in range(1, n_sensors+1)]
+        # Create realistic ARGO sensor data around Indian/Pacific Ocean
+        argo_sensors = pd.DataFrame({
+            'lat': [
+                # Indian Ocean sensors
+                8.5, 12.3, 15.7, 6.2, 9.8, 14.1, 18.4, 22.3, 
+                # Bay of Bengal
+                16.2, 19.5, 13.8, 11.4, 17.9, 20.1,
+                # Arabian Sea  
+                10.5, 8.9, 12.7, 15.3, 18.6, 21.2,
+                # Pacific Ocean (closer region)
+                25.1, 28.4, 23.7, 26.9, 30.2, 24.8
+            ],
+            'lon': [
+                # Indian Ocean sensors
+                78.2, 82.5, 85.1, 79.8, 83.4, 88.2, 86.7, 89.5,
+                # Bay of Bengal
+                84.3, 87.9, 81.6, 79.2, 85.8, 88.4,
+                # Arabian Sea
+                75.3, 73.1, 77.8, 74.6, 76.9, 78.5,
+                # Pacific Ocean
+                120.3, 125.7, 118.9, 123.4, 128.1, 121.8
+            ],
+            'temperature': [
+                26.8, 28.2, 27.5, 29.1, 26.3, 25.9, 24.7, 23.8,
+                27.9, 28.5, 29.3, 30.1, 26.8, 25.4,
+                31.2, 32.1, 30.8, 29.7, 28.9, 27.6,
+                22.1, 21.5, 23.4, 20.9, 19.8, 22.7
+            ],
+            'salinity': [
+                34.2, 34.5, 34.1, 34.8, 34.3, 33.9, 34.6, 34.4,
+                34.1, 34.7, 34.9, 35.2, 34.0, 33.8,
+                35.8, 36.1, 35.4, 35.0, 34.7, 34.3,
+                33.5, 33.2, 33.8, 33.1, 32.9, 33.6
+            ],
+            'depth': [
+                2500, 3200, 2800, 3500, 2900, 3100, 3800, 4200,
+                2200, 2600, 2400, 1900, 2700, 3000,
+                3400, 3600, 3300, 2800, 2500, 2100,
+                4500, 4800, 4200, 4600, 5000, 4400
+            ],
+            'location': [
+                'IO-001', 'IO-002', 'IO-003', 'IO-004', 'IO-005', 'IO-006', 'IO-007', 'IO-008',
+                'BB-001', 'BB-002', 'BB-003', 'BB-004', 'BB-005', 'BB-006',
+                'AS-001', 'AS-002', 'AS-003', 'AS-004', 'AS-005', 'AS-006',
+                'PO-001', 'PO-002', 'PO-003', 'PO-004', 'PO-005', 'PO-006'
+            ]
         })
         
-        # Create map
+        # Control panel with clear descriptions
+        show_location = True
+        col2, col3, col4 = st.columns(3)
+        
+        with col2:
+            temp_filter = st.selectbox("🌡️ **Temperature Range**", 
+                                     options=["All", "Cold (<25°C)", "Moderate (25-30°C)", "Warm (>30°C)"],
+                                     help="Filter sensors by water temperature")
+            
+        with col3:
+            depth_filter = st.selectbox("🏔️ **Depth Range**", 
+                                      options=["All", "Shallow (<3000m)", "Deep (>3000m)"],
+                                      help="Filter sensors by ocean depth")
+            
+        with col4:
+            region_filter = st.selectbox("🗺️ **Ocean Region**", 
+                                       options=["All Regions", "Indian Ocean", "Bay of Bengal", "Arabian Sea", "Pacific Ocean"],
+                                       help="Focus on specific ocean regions")
+        
+        # Apply filters
+        filtered_data = argo_sensors.copy()
+        
+        if temp_filter == "Cold (<25°C)":
+            filtered_data = filtered_data[filtered_data['temperature'] < 25]
+        elif temp_filter == "Moderate (25-30°C)":
+            filtered_data = filtered_data[(filtered_data['temperature'] >= 25) & (filtered_data['temperature'] <= 30)]
+        elif temp_filter == "Warm (>30°C)":
+            filtered_data = filtered_data[filtered_data['temperature'] > 30]
+            
+        if depth_filter == "Shallow (<3000m)":
+            filtered_data = filtered_data[filtered_data['depth'] < 3000]
+        elif depth_filter == "Deep (>3000m)":
+            filtered_data = filtered_data[filtered_data['depth'] >= 3000]
+            
+        if region_filter == "Indian Ocean":
+            filtered_data = filtered_data[filtered_data['location'].str.startswith('IO')]
+        elif region_filter == "Bay of Bengal":
+            filtered_data = filtered_data[filtered_data['location'].str.startswith('BB')]
+        elif region_filter == "Arabian Sea":
+            filtered_data = filtered_data[filtered_data['location'].str.startswith('AS')]
+        elif region_filter == "Pacific Ocean":
+            filtered_data = filtered_data[filtered_data['location'].str.startswith('PO')]
+        
+        # Determine map center and zoom
+        if st.session_state.map_centered:
+            map_center_lat, map_center_lon = current_lat, current_lon
+            map_zoom = 6
+        else:
+            map_center_lat, map_center_lon = 15.0, 82.0  # Center around Indian Ocean
+            map_zoom = 4
+        
+        # Create the map
         fig = go.Figure()
         
-        # Add sensors
-        fig.add_trace(go.Scattermap(
-            lat=dynamic_sensors['lat'],
-            lon=dynamic_sensors['lon'],
-            mode='markers',
-            marker=dict(
-                size=dynamic_sensors['temperature'] * 0.8,
-                color=dynamic_sensors['temperature'],
-                colorscale='RdYlBu_r',
-                showscale=True,
-                colorbar=dict(title="Temperature (°C)")
-            ),
-            text=dynamic_sensors['sensor_id'],
-            hovertemplate="<b>%{text}</b><br>" +
-                         "Temp: %{marker.color:.1f}°C<br>" +
-                         "Pos: %{lat:.3f}, %{lon:.3f}<br>" +
-                         "<extra></extra>",
-            name="ARGO Sensors"
-        ))
+        # Add ARGO sensors with enhanced styling
+        if len(filtered_data) > 0:
+            fig.add_trace(go.Scattermapbox(
+                lat=filtered_data['lat'],
+                lon=filtered_data['lon'],
+                mode='markers',
+                marker=dict(
+                    size=[temp * 0.8 for temp in filtered_data['temperature']],  # Size based on temperature
+                    color=filtered_data['temperature'],
+                    colorscale='RdYlBu_r',  # Red-Yellow-Blue reversed for temperature
+                    sizemode='diameter',
+                    sizeref=1,
+                    sizemin=8,
+                    showscale=True,
+                    colorbar=dict(
+                        title=dict(text="Temperature (°C)", font=dict(color="white", size=14)),
+                        tickfont=dict(color="white"),
+                        x=1.02
+                    ), # White border around markers
+                ),
+                text=filtered_data['location'],
+                hovertemplate="<b>🌊 ARGO Sensor: %{text}</b><br>" +
+                             "<b>🌡️ Temperature:</b> %{marker.color:.1f}°C<br>" +
+                             "<b>🧂 Salinity:</b> " + filtered_data['salinity'].astype(str) + " psu<br>" +
+                             "<b>🏔️ Depth:</b> " + filtered_data['depth'].astype(str) + "m<br>" +
+                             "<b>📍 Position:</b> %{lat:.3f}, %{lon:.3f}<br>" +
+                             "<extra></extra>",
+                name="ARGO Float Sensors"
+            ))
         
-        # Update layout
+        # Add current location with enhanced styling
+        if show_location:
+            # Outer circle (5m radius, 50% opacity)
+            fig.add_trace(go.Scattermapbox(
+                lat=[current_lat],
+                lon=[current_lon],
+                mode='markers',
+                marker=dict(
+                    size=20,
+                    color='rgba(0, 100, 255, 0.5)',
+                    symbol='circle'
+                ),
+                hovertemplate="<b>📍 Your Location</b><br>" +
+                             "<b>🏙️ City:</b> Coimbatore, Tamil Nadu<br>" +
+                             "<b>📍 Coordinates:</b> %{lat:.4f}, %{lon:.4f}<br>" +
+                             "<extra></extra>",
+                name="Location Area",
+                showlegend=False
+            ))
+            
+            # Inner circle (3m radius, solid blue)
+            fig.add_trace(go.Scattermapbox(
+                lat=[current_lat],
+                lon=[current_lon],
+                mode='markers',
+                marker=dict(
+                    size=12,
+                    color='rgb(0, 100, 255)',
+                    symbol='circle',
+                ),
+                hovertemplate="<b>📍 Your Current Position</b><br>" +
+                             "<b>🏙️ Coimbatore, Tamil Nadu</b><br>" +
+                             "<b>📍 Coordinates:</b> %{lat:.4f}, %{lon:.4f}<br>" +
+                             "<extra></extra>",
+                name="Your Location"
+            ))
+        
+        # Add location centering button as a custom annotation (bottom right)
+      
+        
+        # Update layout with enhanced styling
         fig.update_layout(
             mapbox=dict(
                 style="open-street-map",
-                center=dict(lat=center_lat, lon=center_lon),
-                zoom=85
+                center=dict(lat=map_center_lat, lon=map_center_lon),
+                zoom=map_zoom
             ),
-            height=600,
-            title=f"Live ARGO Data - {len(dynamic_sensors)} Active Sensors in Current View"
+            height=700,
+            font=dict(color="white"),
+            title=dict(
+                text=f"Live ARGO Ocean Data - {len(filtered_data)} Active Sensors",
+                font=dict(size=16, color="white"),
+                x=0
+            ),
+            showlegend=True,
+            legend=dict(
+                yanchor="top",
+                y=0.99,
+                xanchor="left",
+                x=0.01,
+                bgcolor="rgba(255,255,255,0.9)",
+                bordercolor="rgba(0,0,0,0.3)",
+                borderwidth=2,
+                font=dict(color="black", size=12)
+            ),
+            margin=dict(l=0, r=0, t=40, b=0)
         )
         
-        # Display map
-        map_container = st.plotly_chart(fig, use_container_width=True, key="main_map")
+        # Display the map
+        st.plotly_chart(fig, use_container_width=True)
         
-        # Live data summary updates based on current view
+        
+        if st.button("🎯 Center Map to My Location", key="center_btn"):
+                st.session_state.map_centered = True
+                st.rerun()
+      
         st.markdown("---")
-        st.markdown("### 📊 Live Data Summary (Current Map View)")
+        # Data summary with enhanced metrics
+        st.markdown("### 📊 **Live Data Summary**")
+        if len(filtered_data) > 0:
+            st.success(f"✅ **{len(filtered_data)} ARGO sensors** are currently active and transmitting data in the selected region(s).")
+        else:
+            st.warning("⚠️ No sensors match the current filter criteria. Try adjusting the filters above.")
+        st.markdown("")
         
-        # Real-time metrics
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            avg_temp = dynamic_sensors['temperature'].mean()
-            temp_change = np.random.uniform(-0.5, 0.5)
-            st.metric("🌡️ Avg Temperature", f"{avg_temp:.1f}°C", f"{temp_change:+.1f}°C")
+            avg_temp = filtered_data['temperature'].mean() if len(filtered_data) > 0 else 0
+            st.metric("🌡️ **Average Temperature**", f"{avg_temp:.1f}°C", 
+                     delta=f"+{(avg_temp - 26.5):.1f}°C vs baseline")
         
         with col2:
-            active_sensors = len(dynamic_sensors)
-            st.metric("📡 Active Sensors", f"{active_sensors}", f"+{np.random.randint(-2, 5)}")
+            active_sensors = len(filtered_data)
+            st.metric("📡 **Active Sensors**", f"{active_sensors}", 
+                     delta=f"{active_sensors - 20} vs last month")
         
         with col3:
-            avg_depth = dynamic_sensors['depth'].mean()
-            st.metric("🏔️ Avg Depth", f"{avg_depth:.0}m", "Operational")
+            avg_depth = filtered_data['depth'].mean() if len(filtered_data) > 0 else 0
+            st.metric("🏔️ **Average Depth**", f"{avg_depth:.0f}m", 
+                     delta="Operational range")
         
         with col4:
-            avg_salinity = dynamic_sensors['salinity'].mean()
-            salinity_change = np.random.uniform(-0.2, 0.2)
-            st.metric("🧂 Avg Salinity", f"{avg_salinity:.1f} psu", f"{salinity_change:+.1f}")
+            avg_salinity = filtered_data['salinity'].mean() if len(filtered_data) > 0 else 0
+            st.metric("🧂 **Average Salinity**", f"{avg_salinity:.1f} psu", 
+                     delta="Normal range")
         
-        # Auto-refresh functionality (only if enabled)
-        if auto_update:
-            time.sleep(5)
-            st.rerun()
 
     def render_database_page(self):
         """Render database management page"""

@@ -1,7 +1,10 @@
 analytics page, show modal dialog, close button doesnt close the dialog. 
-netcdf to sql convertor, download and import button dont do anyhting. make it download a sample sql file, and import will show modal saying added to dB with details below.
+netcdf to sql convertor, download and import button dont do anyhting. make it download a sample sql file, and import will show modal saying added to dB with details.
 session is not working at all. reloading shows login page even if logged in. 
-map view page, map is not visible
-make login page alone centered instead of wide
+make login page form width 300px 
 
-all the messages are redisplayed after getting repsonse from backend
+
+
+make session messages for each chat in the chat list. so msg history from a chat only appear there
+
+remove chatlist option. instead, it will be just a simple chatbot with no multiple chatlist like chatgpt
