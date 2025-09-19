@@ -191,15 +191,16 @@ class ArgoApp:
         """Render centered login page"""
         st.markdown("""
         <style>
-        .main .block-container {
+        .stVerticalBlock {
             max-width: 500px;
-            padding-top: 5rem;
+            margin-left: auto;
+            margin-right: auto;
         }
         </style>
         """, unsafe_allow_html=True)
         
         st.markdown("""
-        <div style="text-align: center; margin-bottom: 2rem;">
+        <div style="text-align: center; margin-bottom: 2rem; ">
             <div style="background: white; padding: 2rem; border-radius: 2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
                 <h1 style="color: #667eea; margin: 0; font-size: 2.5rem;">🌊 ARGO</h1>
                 <p style="color: #666; margin-top: 0.5rem;">Ocean Data Analytics Platform</p>
@@ -367,37 +368,37 @@ class ArgoApp:
                 st.rerun()
             
             # Chat management (only show on chat page)
-            if st.session_state.current_page == "chats":
-                st.markdown("---")
-                st.markdown("### 💬 Chats")
+            # if st.session_state.current_page == "chats":
+            #     st.markdown("---")
+            #     st.markdown("### 💬 Chats")
                 
-                if st.button("➕ New Chat", key="new_chat_btn", use_container_width=True):
-                    self.new_chat()
+            #     if st.button("➕ New Chat", key="new_chat_btn", use_container_width=True):
+            #         self.new_chat()
                 
-                # Chat list with ChatGPT style
-                current_id = getattr(self, 'chat_id', None)
-                st.markdown('<div style="max-height: 400px; overflow-y: auto;">', unsafe_allow_html=True)
+            #     # Chat list with ChatGPT style
+            #     current_id = getattr(self, 'chat_id', None)
+            #     st.markdown('<div style="max-height: 400px; overflow-y: auto;">', unsafe_allow_html=True)
                 
-                for cid, msgs in st.session_state["chats"].items():
-                    title = st.session_state.get("chat_titles", {}).get(cid, f"Untitled Chat")
-                    # Truncate title if too long
-                    display_title = title[:25] + "..." if len(title) > 25 else title
-                    is_selected = cid == current_id
+            #     for cid, msgs in st.session_state["chats"].items():
+            #         title = st.session_state.get("chat_titles", {}).get(cid, f"Untitled Chat")
+            #         # Truncate title if too long
+            #         display_title = title[:25] + "..." if len(title) > 25 else title
+            #         is_selected = cid == current_id
                     
-                    # Create clickable chat item
-                    chat_class = "chat-item active" if is_selected else "chat-item"
-                    chat_html = f"""
-                    <div class="{chat_class}" onclick="selectChat('{cid}')" title="{title}">
-                        💬 {display_title}
-                    </div>
-                    """
+            #         # Create clickable chat item
+            #         chat_class = "chat-item active" if is_selected else "chat-item"
+            #         chat_html = f"""
+            #         <div class="{chat_class}" onclick="selectChat('{cid}')" title="{title}">
+            #             💬 {display_title}
+            #         </div>
+            #         """
                     
-                    if st.button(f"💬 {display_title}", key=f"chat_{cid}", 
-                               use_container_width=True,
-                               help=title):
-                        self.select_chat(cid)
+            #         if st.button(f"💬 {display_title}", key=f"chat_{cid}", 
+            #                    use_container_width=True,
+            #                    help=title):
+            #             self.select_chat(cid)
                 
-                st.markdown('</div>', unsafe_allow_html=True)
+            #     st.markdown('</div>', unsafe_allow_html=True)
             
             st.markdown("---")
             
