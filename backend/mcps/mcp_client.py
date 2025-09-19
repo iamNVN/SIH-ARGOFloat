@@ -68,12 +68,20 @@ class MCPClient:
         except Exception as e:
             self.logger.error(f"Failed to get MCP tools: {e}")
             raise e
+        
+    async def get_table_schema(self):
+        try:
+            response = await self.session.call_tool("get_schema", {})
+            return response
+        except Exception as e:
+            self.logger.error(f"Failed to get table schema: {e}")
+            raise e
 
     async def process_query(self, query: str):
         try:
             self.logger.info(f"Processing query: {query}")
             user_message = {"role": "user", "content": query}
-            self.messages = [user_message]
+            self.messages.append(user_message)
 
             while True:
                 response = await self.call_llm()
@@ -123,13 +131,22 @@ class MCPClient:
             self.logger.info("Calling LLM")
             response = self.llm.messages.create(
                 model="claude-3-5-haiku-20241022",
-                max_tokens = 1000,
+                temperature=0,
+                max_tokens=3000,
                 messages=self.messages,
                 tools=self.tools,
             )
             return response
         except Exception as e:
             self.logger.error(f"Failed to call LLM: {e}")
+            raise e
+        
+    async def get_sql_query(self, query: str):
+        try:
+            response = await self.session.call_tool("get_sql_query", {"query": query})
+            return response
+        except Exception as e:
+            self.logger.error(f"Failed to get SQL query: {e}")
             raise e
 
     async def cleanup(self):

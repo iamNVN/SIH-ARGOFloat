@@ -6,8 +6,7 @@ import pandas as pd
 import numpy as np
 import json
 from sqlalchemy import create_engine, URL
-import sqlalchemy
-
+from utils.logger import logger
 
 FTP_HOST = "ftp.ifremer.fr"
 FTP_DIR  = "/ifremer/argo/dac/aoml/1900683"
@@ -38,29 +37,32 @@ def download_small_subset():
     print(f"Downloaded {NUM_FILES} files to {LOCAL_DIR.resolve()}")
 
 
-DATA_DIR = "D:/SIH-ARGOFloat/argo_sample"
-meta_file    = r"D:\SIH-ARGOFloat\argo_sample\1900683_meta.nc"
-traj_file    = DATA_DIR + "/1900683_Rtraj.nc"
-tech_file    = DATA_DIR + "/1900683_tech.nc"
-profile_file = DATA_DIR + "/1900683_prof.nc"
+DATA_DIR = Path("../argo_sample")
+meta_file    = DATA_DIR / "1900683_meta.nc"
+traj_file    = DATA_DIR / "1900683_Rtraj.nc"
+tech_file    = DATA_DIR / "1900683_tech.nc"
+profile_file = DATA_DIR / "1900683_prof.nc"
 
 meta_ds = xr.open_dataset(meta_file)
 traj_ds = xr.open_dataset(traj_file, decode_timedelta=True)
 prof_ds = xr.open_dataset(profile_file)
 tech_ds = xr.open_dataset(tech_file)
 
-def to_scalar_or_list(var, sep=", "):
-    vals = var.values
-    if vals.size == 1:
-        return str(vals.item())
-    else:
-        unique_vals = list(dict.fromkeys(pd.Series(vals.ravel()).dropna().tolist()))
-        return sep.join(map(str, unique_vals))
     
-def clean_bytes(val):
+def clean_bytes_like_string(val):
     if isinstance(val, (bytes, bytearray)):
-        return val.decode("utf-8", errors="ignore").strip()
+        try:
+            val = val.decode("utf-8")
+        except Exception:
+            val = str(val)
+    if isinstance(val, str):
+        s = val.strip()
+        if (s.startswith("b'") and s.endswith("'")) or (s.startswith('b"') and s.endswith('"')):
+            s = s[2:-1].strip()
+        s = s.strip('\'"')
+        return s
     return val
+
 
 def safe_json(val):
     try:
@@ -72,154 +74,41 @@ def safe_json(val):
     except Exception:
         return json.dumps(str(val))
 
-meta_dict = {
-    "platform_number":       to_scalar_or_list(meta_ds.PLATFORM_NUMBER),
-    "project_name":          to_scalar_or_list(meta_ds.PROJECT_NAME),
-    "data_centre":           to_scalar_or_list(meta_ds.DATA_CENTRE),
-    "pi_name":               to_scalar_or_list(meta_ds.PI_NAME),
-    "float_owner":           to_scalar_or_list(meta_ds.FLOAT_OWNER),
-    "operating_institution": to_scalar_or_list(meta_ds.OPERATING_INSTITUTION),
-    "launch_date":           to_scalar_or_list(meta_ds.LAUNCH_DATE),
-    "launch_latitude":       to_scalar_or_list(meta_ds.LAUNCH_LATITUDE),
-    "launch_longitude":      to_scalar_or_list(meta_ds.LAUNCH_LONGITUDE),
-    "deployment_platform":   to_scalar_or_list(meta_ds.DEPLOYMENT_PLATFORM),
-    "deployment_cruise_id":  to_scalar_or_list(meta_ds.DEPLOYMENT_CRUISE_ID),
-    "end_mission_date":      to_scalar_or_list(meta_ds.END_MISSION_DATE),
-    "end_mission_status":    to_scalar_or_list(meta_ds.END_MISSION_STATUS),
+meta_df = meta_ds.to_dataframe()
+meta_df = meta_df.map(clean_bytes_like_string)
 
-    # Arrays of sensors/parameters
-    "sensor":                to_scalar_or_list(meta_ds.SENSOR),
-    "sensor_maker":          to_scalar_or_list(meta_ds.SENSOR_MAKER),
-    "sensor_model":          to_scalar_or_list(meta_ds.SENSOR_MODEL),
-    "parameter":             to_scalar_or_list(meta_ds.PARAMETER),
-    "parameter_units":       to_scalar_or_list(meta_ds.PARAMETER_UNITS),
-    "parameter_accuracy":    to_scalar_or_list(meta_ds.PARAMETER_ACCURACY),
-    "config_parameter_name": to_scalar_or_list(meta_ds.CONFIG_PARAMETER_NAME),
-    "config_parameter_value":to_scalar_or_list(meta_ds.CONFIG_PARAMETER_VALUE),
-}
+profile_subset = prof_ds.isel(N_PROF=slice(0, 5))
+rows = []
+for prof_idx in range(profile_subset.dims["N_PROF"]):
+    for level_idx in range(profile_subset.dims["N_LEVELS"]):
+        row = {}
+        for var in ["PLATFORM_NUMBER", "PROJECT_NAME", "PI_NAME", "DATA_CENTRE", 
+                    "CYCLE_NUMBER", "JULD", "LATITUDE", "LONGITUDE"]:
+            if var in profile_subset:
+                val = profile_subset[var].values[prof_idx]
+                if isinstance(val, (np.ndarray, list)):
+                    val = val.item() if val.size == 1 else val.tolist()
+                row[var.lower()] = val
+        for var in ["PRES", "TEMP", "PSAL", "PRES_QC", "TEMP_QC", "PSAL_QC"]:
+            if f"{var}_ADJUSTED" in profile_subset:
+                row[var.lower()] = profile_subset[f"{var}_ADJUSTED"].values[prof_idx, level_idx]
+            elif var in profile_subset:
+                row[var.lower()] = profile_subset[var].values[prof_idx, level_idx]
+            else:
+                row[var.lower()] = None
 
-meta_df = pd.DataFrame([dict(list(meta_dict.items())[:100])])
-meta_df = meta_df.applymap(clean_bytes)
+        rows.append(row)
+profile_df = pd.DataFrame(rows)
+profile_df = profile_df.map(clean_bytes_like_string)
+profile_df = profile_df.dropna(subset=["pres","temp","psal"], how="all")
 
-profile_dict = {
-    # --- Identification ---
-    "platform_number":      to_scalar_or_list(prof_ds.PLATFORM_NUMBER),
-    "project_name":         to_scalar_or_list(prof_ds.PROJECT_NAME),
-    "pi_name":              to_scalar_or_list(prof_ds.PI_NAME),
-    "data_centre":          to_scalar_or_list(prof_ds.DATA_CENTRE),
-    "cycle_number":         to_scalar_or_list(prof_ds.CYCLE_NUMBER),
-    "direction":            to_scalar_or_list(prof_ds.DIRECTION),
-    "platform_type":        to_scalar_or_list(prof_ds.PLATFORM_TYPE),
-    "wmo_inst_type":        to_scalar_or_list(prof_ds.WMO_INST_TYPE),
+trajectory_subset = traj_ds.isel(N_MEASUREMENT=slice(0, 1))
+trajectory_df = trajectory_subset.to_dataframe().reset_index()
+trajectory_df = trajectory_df.map(clean_bytes_like_string)
+trajectory_df = trajectory_df[:300]
 
-    # --- Time & Location ---
-    "juld":                 to_scalar_or_list(prof_ds.JULD),
-    "latitude":             to_scalar_or_list(prof_ds.LATITUDE),
-    "longitude":            to_scalar_or_list(prof_ds.LONGITUDE),
-    "positioning_system":   to_scalar_or_list(prof_ds.POSITIONING_SYSTEM),
-
-    # --- Profile Quality ---
-    "juld_qc":              to_scalar_or_list(prof_ds.JULD_QC),
-    "position_qc":          to_scalar_or_list(prof_ds.POSITION_QC),
-    "profile_pres_qc":      to_scalar_or_list(prof_ds.PROFILE_PRES_QC),
-    "profile_temp_qc":      to_scalar_or_list(prof_ds.PROFILE_TEMP_QC),
-    "profile_psal_qc":      to_scalar_or_list(prof_ds.PROFILE_PSAL_QC),
-
-    # --- Measurement Data (always lists) ---
-    "pres":                 prof_ds.PRES.values.tolist(),
-    "pres_qc":              prof_ds.PRES_QC.values.tolist(),
-    "pres_adjusted":        prof_ds.PRES_ADJUSTED.values.tolist(),
-    "temp":                 prof_ds.TEMP.values.tolist(),
-    "temp_qc":              prof_ds.TEMP_QC.values.tolist(),
-    "temp_adjusted":        prof_ds.TEMP_ADJUSTED.values.tolist(),
-    "psal":                 prof_ds.PSAL.values.tolist(),
-    "psal_qc":              prof_ds.PSAL_QC.values.tolist(),
-    "psal_adjusted":        prof_ds.PSAL_ADJUSTED.values.tolist(),
-
-    # --- Sampling / Calibration ---
-    "vertical_sampling_scheme": to_scalar_or_list(prof_ds.VERTICAL_SAMPLING_SCHEME),
-    "parameter":                to_scalar_or_list(prof_ds.PARAMETER),
-    "scientific_calib_comment": to_scalar_or_list(prof_ds.SCIENTIFIC_CALIB_COMMENT),
-}
-
-profile_df = pd.DataFrame([dict(list(profile_dict.items())[:100])])
-profile_df = profile_df.applymap(clean_bytes)
-for col in ["pres","pres_qc","pres_adjusted",
-            "temp","temp_qc","temp_adjusted",
-            "psal","psal_qc","psal_adjusted"]:
-    profile_df[col] = profile_df[col].apply(safe_json)
-
-
-trajectory_dict = {
-    # --- Identification ---
-    "platform_number":      to_scalar_or_list(traj_ds.PLATFORM_NUMBER),
-    "project_name":         to_scalar_or_list(traj_ds.PROJECT_NAME),
-    "pi_name":              to_scalar_or_list(traj_ds.PI_NAME),
-    "data_centre":          to_scalar_or_list(traj_ds.DATA_CENTRE),
-    "platform_type":        to_scalar_or_list(traj_ds.PLATFORM_TYPE),
-    "wmo_inst_type":        to_scalar_or_list(traj_ds.WMO_INST_TYPE),
-
-    # --- Time & Location ---
-    "juld":                 to_scalar_or_list(traj_ds.JULD),
-    "juld_adjusted":        to_scalar_or_list(traj_ds.JULD_ADJUSTED),
-    "latitude":             to_scalar_or_list(traj_ds.LATITUDE),
-    "longitude":            to_scalar_or_list(traj_ds.LONGITUDE),
-    "position_accuracy":    to_scalar_or_list(traj_ds.POSITION_ACCURACY),
-    "positioning_system":   to_scalar_or_list(traj_ds.POSITIONING_SYSTEM),
-
-    # --- Cycle Info ---
-    "cycle_number":         to_scalar_or_list(traj_ds.CYCLE_NUMBER),
-    "cycle_number_adjusted":to_scalar_or_list(traj_ds.CYCLE_NUMBER_ADJUSTED),
-    "config_mission_number":to_scalar_or_list(traj_ds.CONFIG_MISSION_NUMBER),
-
-    # --- Core Measurements ---
-    "pres":                 to_scalar_or_list(traj_ds.PRES),
-    "pres_adjusted":        to_scalar_or_list(traj_ds.PRES_ADJUSTED),
-    "temp":                 to_scalar_or_list(traj_ds.TEMP),
-    "temp_adjusted":        to_scalar_or_list(traj_ds.TEMP_ADJUSTED),
-    "psal":                 to_scalar_or_list(traj_ds.PSAL),
-    "psal_adjusted":        to_scalar_or_list(traj_ds.PSAL_ADJUSTED),
-
-    # --- Quality Flags ---
-    "pres_qc":              to_scalar_or_list(traj_ds.PRES_QC),
-    "temp_qc":              to_scalar_or_list(traj_ds.TEMP_QC),
-    "psal_qc":              to_scalar_or_list(traj_ds.PSAL_QC),
-    "position_qc":          to_scalar_or_list(traj_ds.POSITION_QC),
-    "juld_qc":              to_scalar_or_list(traj_ds.JULD_QC),
-
-    # --- Optional Mission Events ---
-    "juld_descent_start":   to_scalar_or_list(traj_ds.JULD_DESCENT_START),
-    "juld_ascent_end":      to_scalar_or_list(traj_ds.JULD_ASCENT_END),
-    "juld_transmission_start": to_scalar_or_list(traj_ds.JULD_TRANSMISSION_START),
-    "juld_transmission_end":   to_scalar_or_list(traj_ds.JULD_TRANSMISSION_END),
-}
-
-trajectory_df = pd.DataFrame([dict(list(trajectory_dict.items())[:100])])
-trajectory_df = trajectory_df.applymap(clean_bytes)
-
-tech_dict = {
-    # --- Identification ---
-    "platform_number":          to_scalar_or_list(tech_ds.PLATFORM_NUMBER),
-    "data_centre":              to_scalar_or_list(tech_ds.DATA_CENTRE),
-
-    # --- Version / Metadata ---
-    "data_type":                to_scalar_or_list(tech_ds.DATA_TYPE),
-    "format_version":           to_scalar_or_list(tech_ds.FORMAT_VERSION),
-    "handbook_version":         to_scalar_or_list(tech_ds.HANDBOOK_VERSION),
-
-    # --- Timestamps ---
-    "date_creation":            to_scalar_or_list(tech_ds.DATE_CREATION),
-    "date_update":              to_scalar_or_list(tech_ds.DATE_UPDATE),
-
-    # --- Mission Tracking ---
-    "cycle_number":             to_scalar_or_list(tech_ds.CYCLE_NUMBER),
-
-    # --- Technical Parameters ---
-    "technical_parameter_name": to_scalar_or_list(tech_ds.TECHNICAL_PARAMETER_NAME),
-    "technical_parameter_value":to_scalar_or_list(tech_ds.TECHNICAL_PARAMETER_VALUE),
-}
-tech_df = pd.DataFrame([dict(list(tech_dict.items())[:100])])
-tech_df = tech_df.applymap(clean_bytes)
+tech_df = tech_ds.to_dataframe()
+tech_df = tech_df.map(clean_bytes_like_string)
 
 def main():
     url = URL.create(
@@ -236,17 +125,9 @@ def main():
     meta_df.to_sql("argo_metadata", engine, if_exists="replace", index=False)
     trajectory_df.to_sql("argo_trajectory", engine, if_exists="replace", index=False)
     tech_df.to_sql("argo_technical", engine, if_exists="replace", index=False)
-    profile_df.to_sql(
-    "argo_profile",
-    engine,
-    if_exists="replace",
-    index=False,
-    dtype={"pres": sqlalchemy.types.JSON,
-           "temp": sqlalchemy.types.JSON,
-           "psal": sqlalchemy.types.JSON}
-)
+    profile_df.to_sql("argo_profile", engine, if_exists="replace", index=False)
 
-    print("DataFrames successfully loaded into PostgreSQL tables.")
+print("DataFrames successfully loaded into PostgreSQL tables.")
 
 if __name__ == "__main__":
     main()

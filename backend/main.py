@@ -53,12 +53,30 @@ class ToolCallRequest(BaseModel):
     name: str
     args: Dict[str, Any]
 
+@app.post("/get_schema")
+async def get_schema():
+    """Get the table schema from the MCP server."""
+    try:
+        schema = await app.state.client.get_table_schema()
+        return {"schema": schema}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/query")
 async def process_query(request: QueryRequest):
     """Process a user query and return the response."""
     try:
         messages = await app.state.client.process_query(request.query)
         return {"messages": messages}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/get_sql_query")
+async def get_sql_query(request: QueryRequest):
+    """Get the SQL query generated from a natural language question."""
+    try:
+        sql_query = await app.state.client.get_sql_query(request.query)
+        return {"sql_query": sql_query}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     

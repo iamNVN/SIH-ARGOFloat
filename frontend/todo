@@ -1,4 +1,7 @@
-remove top sensors in analytics page and add all sensors and their uptime, location and details
-make sure all buttons in data export have same height. show toast notification and download dummy files
-change button styling
-change live data summary in map view page as map is moved
+analytics page, show modal dialog, close button doesnt close the dialog. 
+netcdf to sql convertor, download and import button dont do anyhting. make it download a sample sql file, and import will show modal saying added to dB with details below.
+session is not working at all. reloading shows login page even if logged in. 
+map view page, map is not visible
+make login page alone centered instead of wide
+
+all the messages are redisplayed after getting repsonse from backend
